@@ -92,8 +92,10 @@ $("btnGuardar").onclick = async () => {
     if (tipo === "domicilio") {
       const tel = $("tel").value.replace(/\D/g, ""), nom = $("nombre").value.trim(), ape = $("apellido").value.trim();
       const dir = (!$("dirSel").hidden && $("dirSel").value !== "nueva") ? $("dirSel").value : $("dirNueva").value.trim();
-      if (tel.length !== 8 || !nom || !dir) return alert("Faltan teléfono, nombre o dirección.");
-      const c = { nombre:nom, apellido:ape, direcciones:arrayUnion(dir) };
+      if (tel.length !== 8 || !dir) return alert("Faltan el teléfono (8 dígitos) o la dirección.");
+      const c = { direcciones:arrayUnion(dir) };
+      if (nom) c.nombre = nom;
+      if (ape) c.apellido = ape;
       if ($("tel2").value.trim()) c.tel2 = $("tel2").value.trim();
       await setDoc(doc(db, "clientes", tel), c, {merge:true});
       Object.assign(p, {tel, nombre:(nom + " " + ape).trim(), direccion:dir});
@@ -109,7 +111,7 @@ $("btnGuardar").onclick = async () => {
 function mix(it) { return MARCAS.filter(([k]) => it[k]).map(([k,n]) => `${it[k]} ${n}`).join(", "); }
 function imprimir(p) {
   $("ticket").innerHTML = `<h2>AGUA CRISTAL</h2><p>${p.fecha} ${p.hora}</p><hr>
-    <p><b>${esc(p.nombre)}</b><br>Tel: ${esc(p.tel)}<br>${esc(p.direccion)}</p><hr>
+    <p><b>${esc(p.nombre || "Sin nombre")}</b><br>Tel: ${esc(p.tel)}<br>${esc(p.direccion)}</p><hr>
     ${MARCAS.filter(([k]) => p.items[k]).map(([k,n]) => `<p>${p.items[k]} x ${n}</p>`).join("")}
     <hr><p><b>Total: ${p.cantidad} garrafón(es) · Q${p.total}</b></p>`;
   setTimeout(() => window.print(), 200);
@@ -132,7 +134,7 @@ function pintar() {
   $("resumen").innerHTML = `<div class="kpi"><div><b>${suma(loc)}</b>Local · Q${q(loc)}</div><div><b>${suma(dom)}</b>Domicilio · Q${q(dom)}</div><div><b>${del.filter(p => p.entregado).length}/${del.length}</b>Entregados</div></div>`;
   $("lista").innerHTML = del.map(p => `<div class="ped ${p.entregado ? "ok" : ""}">
     <input type="checkbox" data-id="${p.id}" ${p.entregado ? "checked" : ""}>
-    <div class="info"><b>${p.tipo === "local" ? "🏪 Local" : "🛵 " + esc(p.nombre)}</b> · ${p.hora.slice(0,5)}<br>${p.tipo === "domicilio" ? esc(p.direccion) + " · " + esc(p.tel) + "<br>" : ""}${mix(p.items)} · Q${p.total}</div>
+    <div class="info"><b>${p.tipo === "local" ? "🏪 Local" : "🛵 " + esc(p.nombre || "Sin nombre")}</b> · ${p.hora.slice(0,5)}<br>${p.tipo === "domicilio" ? esc(p.direccion) + " · " + esc(p.tel) + "<br>" : ""}${mix(p.items)} · Q${p.total}</div>
     <span class="solo-maestro"><button data-id="${p.id}" class="ed">✏️</button><button data-id="${p.id}" class="del">🗑️</button></span></div>`).join("") || "<p>Sin pedidos este día.</p>";
 
   const t = new Date(), meta = metas[t.getDay()] || 0, hechos = suma(pedidos.filter(p => p.fecha === hoy()));
