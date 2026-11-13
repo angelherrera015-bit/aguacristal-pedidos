@@ -52,3 +52,9 @@ body.maestro .solo-maestro{display:revert}
   @page{margin:2mm}
 }
 .ped.bajo{border-left:6px solid #c0392b}
+nav{overflow-x:auto}nav button{flex:1 0 auto;white-space:nowrap;padding:16px 14px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;background:#fff}
+th,td{border:1px solid #cfe9f8;padding:6px;text-align:left}
+th{background:var(--cel);color:#fff}
+td button{border:0;background:none;font-size:18px}
