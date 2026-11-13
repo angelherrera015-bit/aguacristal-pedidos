@@ -64,10 +64,24 @@
     </div>
   </section>
 
+  <section id="t-admin" class="tab" hidden>
+    <div id="resAdmin"></div>
+    <div class="card"><h3>Registrar gasto</h3>
+      <select id="gTipo"><option value="compra">Compra de inventario</option><option value="imprevisto">Imprevisto u otro gasto</option></select>
+      <select id="gItem"></select>
+      <input id="gCant" type="number" step="any" placeholder="Cantidad comprada">
+      <input id="gConc" placeholder="Concepto (ej. pipa, reparación moto)">
+      <input id="gMonto" type="number" step="any" placeholder="Monto Q">
+      <button id="btnGasto" class="btn">Guardar gasto</button></div>
+    <div class="card"><h3>Inventario</h3><div id="invLista"></div><button id="btnNuevoItem" class="btn">+ Nuevo insumo</button></div>
+    <div class="card"><h3>Gastos del mes</h3><div id="gastosLista"></div></div>
+  </section>
+
   <nav>
     <button data-t="pedido" class="on">Pedido</button>
     <button data-t="ventas">Ventas</button>
     <button data-t="metas">Metas</button>
+    <button data-t="admin" class="solo-maestro">Admin</button>
   </nav>
 </main>
 

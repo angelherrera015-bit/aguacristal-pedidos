@@ -1,6 +1,6 @@
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,query,where,onSnapshot,serverTimestamp,arrayUnion} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,query,where,onSnapshot,serverTimestamp,arrayUnion,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // 1) PEGA AQUÍ LA CONFIGURACIÓN DE TU PROYECTO FIREBASE
 const firebaseConfig = {
@@ -17,7 +17,7 @@ const auth = getAuth(app), db = getFirestore(app);
 const $ = id => document.getElementById(id);
 const MARCAS = [["salvavidas","Salvavidas"],["scandia","Scandia"],["carrera","Carrera"],["sinmarca","Sin marca"]];
 const PRECIO = {domicilio:10, local:9};
-const METAS0 = {1:65,2:55,3:49,4:41,5:44,6:61};
+const METAS0 = {1:65,2:55,3:50,4:50,5:50,6:65};
 const DIAS = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const fecha = d => d.toLocaleDateString("sv");
 const hoy = () => fecha(new Date());
@@ -101,6 +101,7 @@ $("btnGuardar").onclick = async () => {
       Object.assign(p, {tel, nombre:(nom + " " + ape).trim(), direccion:dir});
     }
     await addDoc(collection(db, "pedidos"), p);
+    await moverStock(n, -1);
     if (tipo === "domicilio") imprimir(p);
     MARCAS.forEach(([k]) => cant[k] = 0);
     ["tel","nombre","apellido","dirNueva","tel2"].forEach(i => $(i).value = "");
@@ -121,6 +122,8 @@ function imprimir(p) {
 function iniciar() {
   $("dia").value = hoy(); $("dia").min = lunes(); $("dia").max = hoy(); $("dia").onchange = pintar;
   $("inputsMeta").innerHTML = [1,2,3,4,5,6].map(d => `<label>${DIAS[d]}<input type="number" min="0" data-d="${d}"></label>`).join("");
+  onSnapshot(doc(db, "config", "consumo"), s => { consumo = s.exists() ? s.data() : {}; pintarAdmin(); });
+  if (rol === "maestro") iniciarAdmin();
   onSnapshot(doc(db, "config", "metas"), s => { metas = s.exists() ? {...METAS0, ...s.data()} : {...METAS0}; pintar(); });
   onSnapshot(query(collection(db, "pedidos"), where("fecha", ">=", lunes())), s => {
     pedidos = s.docs.map(d => ({id:d.id, ...d.data()})); pintar();
@@ -148,7 +151,7 @@ function pintar() {
 $("lista").onclick = async e => {
   const b = e.target.closest("button"); if (!b) return;
   const ref = doc(db, "pedidos", b.dataset.id);
-  if (b.classList.contains("del") && confirm("¿Eliminar este pedido?")) await deleteDoc(ref);
+  if (b.classList.contains("del") && confirm("¿Eliminar este pedido?")) { const p = pedidos.find(x => x.id === b.dataset.id); await deleteDoc(ref); if (p) await moverStock(p.cantidad, 1); }
   if (b.classList.contains("ed")) {
     const p = pedidos.find(x => x.id === b.dataset.id);
     const nombre = prompt("Nombre", p.nombre); if (nombre === null) return;
@@ -171,6 +174,65 @@ $("btnExcel").onclick = async () => {
     Garrafones:p.cantidad, "Total Q":p.total, Entregado:p.entregado ? "Sí" : "No", Registró:p.por }));
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), "Ventas");
   XLSX.writeFile(wb, `ventas-agua-cristal-${hoy()}.xlsx`);
+};
+
+/* ---------- Inventario, gastos y resultado (solo administrador) ---------- */
+const FIJOS = [["Alquiler",1500],["Agua",1000],["Repartidor",4000],["Operadora",3500],["Luz",200],["Internet",100],["Reserva bono 14 y aguinaldo",933.33]];
+const FIJO_MES = FIJOS.reduce((a,[,m]) => a + m, 0), EQUILIBRIO = 51;
+let consumo = {}, inv = [], gastos = [], pedMes = [];
+const Q = n => "Q" + (+n).toLocaleString("es-GT",{minimumFractionDigits:2,maximumFractionDigits:2});
+const mesIni = () => hoy().slice(0,7) + "-01";
+async function moverStock(n, signo) {
+  for (const [id,c] of Object.entries(consumo)) if (c > 0) try { await updateDoc(doc(db,"inventario",id), {stock:increment(signo*n*c)}); } catch {}
+}
+function diasLaborados() { const t = new Date(); let n = 0; for (let d = 1; d <= t.getDate(); d++) if (new Date(t.getFullYear(), t.getMonth(), d).getDay()) n++; return n; }
+function iniciarAdmin() {
+  onSnapshot(collection(db,"inventario"), s => { inv = s.docs.map(d => ({id:d.id, ...d.data()})); pintarAdmin(); });
+  onSnapshot(query(collection(db,"gastos"), where("fecha",">=",mesIni())), s => { gastos = s.docs.map(d => ({id:d.id, ...d.data()})); pintarAdmin(); });
+  onSnapshot(query(collection(db,"pedidos"), where("fecha",">=",mesIni())), s => { pedMes = s.docs.map(d => d.data()); pintarAdmin(); });
+}
+function pintarAdmin() {
+  if (rol !== "maestro") return;
+  const ing = pedMes.reduce((s,p) => s + p.total, 0), gas = gastos.reduce((s,g) => s + g.monto, 0);
+  const fij = FIJO_MES * Math.min(diasLaborados(), 26) / 26, gan = ing - gas - fij;
+  $("resAdmin").innerHTML = `<div class="card"><h3>Resultado del mes (real)</h3><div class="kpi"><div><b>${Q(ing)}</b>Ingresos</div><div><b>${Q(gas + fij)}</b>Gastos</div><div><b style="color:${gan < 0 ? "#c0392b" : "var(--ok)"}">${Q(gan)}</b>Ganancia</div></div><p>Gastos = compras e imprevistos ${Q(gas)} + fijos prorrateados ${Q(fij)}. Equilibrio diario: ${EQUILIBRIO} garrafones.</p></div>`;
+  $("gItem").innerHTML = inv.map(i => `<option value="${i.id}">${esc(i.nombre)}</option>`).join("");
+  $("gItem").hidden = $("gCant").hidden = $("gTipo").value !== "compra";
+  $("invLista").innerHTML = inv.map(i => `<div class="ped ${i.stock <= i.minimo ? "bajo" : ""}"><div class="info"><b>${esc(i.nombre)}</b>: ${+(+i.stock).toFixed(1)} ${esc(i.unidad || "")}${i.stock <= i.minimo ? " ⚠️ stock bajo" : ""}<br>Consumo por garrafón: ${consumo[i.id] || 0}</div><button data-id="${i.id}" class="aj">✏️</button></div>`).join("") || "<p>Sin insumos. Crea el primero.</p>";
+  $("gastosLista").innerHTML = gastos.sort((a,b) => b.fecha.localeCompare(a.fecha)).map(g => `<div class="ped"><div class="info">${g.fecha} · <b>${esc(g.concepto)}</b> · ${Q(g.monto)}</div><button data-id="${g.id}" class="dg">🗑️</button></div>`).join("") || "<p>Sin gastos este mes.</p>";
+}
+$("gTipo").onchange = pintarAdmin;
+$("btnGasto").onclick = async () => {
+  const monto = +$("gMonto").value, t = $("gTipo").value, itemId = $("gItem").value, cantidad = +$("gCant").value;
+  let concepto = $("gConc").value.trim();
+  if (!(monto > 0)) return alert("Escribe el monto.");
+  if (t === "compra") { if (!itemId || !(cantidad > 0)) return alert("Elige el insumo y la cantidad."); concepto = concepto || inv.find(i => i.id === itemId).nombre; }
+  else if (!concepto) return alert("Escribe el concepto.");
+  const g = {fecha:hoy(), tipo:t, concepto, monto, por:auth.currentUser.email, ts:serverTimestamp()};
+  if (t === "compra") Object.assign(g, {itemId, cantidad});
+  await addDoc(collection(db,"gastos"), g);
+  if (t === "compra") await updateDoc(doc(db,"inventario",itemId), {stock:increment(cantidad)});
+  ["gCant","gConc","gMonto"].forEach(i => $(i).value = "");
+};
+$("btnNuevoItem").onclick = async () => {
+  const nombre = prompt("Nombre del insumo (ej. Tapones)"); if (!nombre) return;
+  const unidad = prompt("Unidad (ej. tapones, lb, bolsa)", "unidades") || "";
+  const stock = +prompt("Stock actual", 0) || 0, minimo = +prompt("Avisar cuando quede (stock mínimo)", 0) || 0;
+  const c = +prompt("Cuánto se gasta por cada garrafón (0 si no aplica). Ej. tapones: 1", 0) || 0;
+  const id = nombre.toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "");
+  await setDoc(doc(db,"inventario",id), {nombre, unidad, stock, minimo});
+  await setDoc(doc(db,"config","consumo"), {[id]:c}, {merge:true});
+};
+$("invLista").onclick = async e => {
+  const b = e.target.closest(".aj"); if (!b) return; const i = inv.find(x => x.id === b.dataset.id);
+  const v = prompt("Stock real de " + i.nombre, i.stock); if (v === null) return;
+  await updateDoc(doc(db,"inventario",i.id), {stock:+v || 0});
+  const c = prompt("Consumo por garrafón", consumo[i.id] || 0); if (c !== null) await setDoc(doc(db,"config","consumo"), {[i.id]:+c || 0}, {merge:true});
+};
+$("gastosLista").onclick = async e => {
+  const b = e.target.closest(".dg"); if (!b || !confirm("¿Eliminar este gasto?")) return;
+  const g = gastos.find(x => x.id === b.dataset.id); await deleteDoc(doc(db,"gastos",g.id));
+  if (g.itemId) try { await updateDoc(doc(db,"inventario",g.itemId), {stock:increment(-g.cantidad)}); } catch {}
 };
 
 pintarMarcas();
