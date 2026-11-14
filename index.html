@@ -47,9 +47,11 @@
 
   <section id="t-ventas" class="tab" hidden>
     <div class="fila">
-      <input type="date" id="dia">
-      <button id="btnExcel" class="btn solo-maestro">Descargar Excel</button>
+      <select id="perTipo"><option value="dia">Día</option><option value="semana">Semana</option><option value="quincena">Quincena</option><option value="mes">Mes</option><option value="rango">Rango de fechas</option></select>
+      <input type="date" id="dia"><input type="date" id="dia2" hidden>
     </div>
+    <p id="perTxt"></p>
+    <button id="btnExcel" class="btn solo-maestro">Descargar reporte (Excel)</button>
     <div id="resumen"></div>
     <div id="stockBox"></div>
     <div id="lista"></div>
