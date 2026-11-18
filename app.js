@@ -118,6 +118,20 @@ function imprimir(p) {
   setTimeout(() => window.print(), 200);
 }
 
+let llamadaN = null;
+async function llamada(n) {
+  llamadaN = n;
+  const s = await getDoc(doc(db, "clientes", n)), c = s.exists() ? s.data() : null, nom = c ? [c.nombre, c.apellido].filter(Boolean).join(" ") || "Cliente sin nombre" : "Cliente nuevo";
+  $("llamada").hidden = false; $("llamada").innerHTML = `📞 <b>${esc(nom)}</b> · ${n} <button class="btn" id="btnLl">Cargar pedido</button>`;
+  navigator.vibrate?.(400);
+  if (!$("tel").value && Object.values(cant).every(v => !v)) cargarLlamada();
+}
+function cargarLlamada() {
+  document.querySelector('nav button[data-t="pedido"]').click(); setTipo("domicilio");
+  $("tel").value = llamadaN; buscar(); $("llamada").hidden = true;
+}
+$("llamada").onclick = e => { if (e.target.id === "btnLl") cargarLlamada(); };
+
 /* ---------- Ventas y metas ---------- */
 function iniciar() {
   $("dia").value = $("dia2").value = hoy(); $("dia").max = $("dia2").max = hoy(); $("dia").onchange = $("dia2").onchange = $("perTipo").onchange = cargarRes; cargarRes();
@@ -129,6 +143,17 @@ function iniciar() {
   onSnapshot(query(collection(db, "pedidos"), where("fecha", ">=", lunes())), s => {
     pedidos = s.docs.map(d => ({id:d.id, ...d.data()})); pintar();
   });
+  let primeraLl = true;
+  onSnapshot(collection(db, "llamadas"), s => {
+    if (primeraLl) { primeraLl = false; return; }
+    s.docChanges().forEach(c => { if (c.type !== "added") return; const n = String(c.doc.data().tel || "").replace(/\D/g, "").slice(-8); if (n.length === 8) llamada(n); deleteDoc(c.doc.ref).catch(() => {}); });
+  });
+  const tp = new URLSearchParams(location.search).get("tel");
+  if (tp) {
+    const n = tp.replace(/\D/g, "").slice(-8);
+    if (n.length === 8) { document.querySelector('nav button[data-t="pedido"]').click(); setTipo("domicilio"); $("tel").value = n; buscar(); }
+    history.replaceState(null, "", location.pathname);
+  }
 }
 function suma(arr) { return arr.reduce((a,p) => a + p.cantidad, 0); }
 function pintar() {
@@ -171,6 +196,18 @@ function pintarRes() {
     <div class="info"><b>${p.tipo === "local" ? "🏪 Local" : "🛵 " + esc(p.nombre || "Sin nombre")}</b> · ${p.hora.slice(0,5)}<br>${p.tipo === "domicilio" ? esc(p.direccion) + " · " + esc(p.tel) + "<br>" : ""}${mix(p.items)} · Q${p.total}</div>
     <span class="solo-maestro"><button data-id="${p.id}" class="ed">✏️</button><button data-id="${p.id}" class="del">🗑️</button></span></div>`).join("") || "<p>Sin pedidos este día.</p>";
 }
+$("btnAdd").onclick = async () => {
+  if ($("perTipo").value !== "dia") return alert("Elige el modo Día y la fecha a la que quieres agregar ventas.");
+  const f = $("dia").value || hoy();
+  const loc = +prompt(`Ventas del ${f}: garrafones en LOCAL que faltan registrar (0 si ninguno)`, 0) || 0;
+  const dom = +prompt(`Ventas del ${f}: garrafones a DOMICILIO que faltan registrar (0 si ninguno)`, 0) || 0;
+  if (loc <= 0 && dom <= 0) return;
+  const desc = confirm("¿Descontar tapones y sellos del inventario por estas ventas?");
+  for (const [t,c] of [["local",loc],["domicilio",dom]]) if (c > 0) {
+    await setDoc(doc(db,"pedidos",`man-${f}-${t}-${Date.now()}`), {tipo:t, items:{}, cantidad:c, total:c * PRECIO[t], entregado:true, fecha:f, hora:"00:00:00", por:auth.currentUser.email, ts:serverTimestamp(), tel:"", nombre:"Ventas agregadas", direccion:"", manual:true});
+    if (desc) await moverStock(c, -1);
+  }
+};
 $("lista").onclick = async e => {
   const b = e.target.closest("button"); if (!b) return;
   const ref = doc(db, "pedidos", b.dataset.id);
