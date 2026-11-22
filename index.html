@@ -54,6 +54,11 @@
 
     <div id="marcas"></div>
     <div class="marca" id="prestBox"><b>🛢️ Tambo prestado</b><div><button id="pMenos">−</button><span id="pN">0</span><button id="pMas">+</button></div></div>
+    <div class="card" id="prestDatos" hidden>
+      <p><b>Datos del tambo prestado</b></p>
+      <select id="pMarca"></select>
+      <div id="pLocal" hidden><input id="pTel" inputmode="numeric" maxlength="8" placeholder="Teléfono (8 dígitos)"><input id="pNom" placeholder="Nombre del cliente"><input id="pDir" placeholder="Dirección"></div>
+    </div>
     <div class="total"><span id="totTxt"></span><button id="btnGuardar" class="btn">Guardar pedido</button></div>
   </section>
 

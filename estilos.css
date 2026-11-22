@@ -56,10 +56,10 @@ th,td{border:1px solid #cfe9f8;padding:6px;text-align:left}
 th{background:var(--cel);color:#fff}
 td button{border:0;background:none;font-size:18px}
 
-#login{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#0D4A8A,#1565A8 45%,#4FC3F7);overflow:hidden;padding:16px}
+#login{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:50;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#0D4A8A,#1565A8 45%,#4FC3F7);overflow:hidden;padding:16px}
 .burbujas i{position:absolute;bottom:-60px;border-radius:50%;background:rgba(255,255,255,.2);animation:sube 12s linear infinite}
 .lcard{position:relative;z-index:2;width:100%;max-width:370px;background:rgba(255,255,255,.93);backdrop-filter:blur(8px);border-radius:26px;padding:24px 22px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.3);animation:entra .7s cubic-bezier(.2,.9,.3,1.2)}
-.lcard img{width:130px;mix-blend-mode:multiply;animation:flota 3s ease-in-out infinite}
+.lcard img{width:130px;filter:drop-shadow(0 4px 8px rgba(13,74,138,.3));animation:flota 3s ease-in-out infinite}
 .lcard h1{margin:4px 0 0;color:var(--azo);font-size:30px}.sub{margin:2px 0 12px;color:var(--az);font-size:13px;letter-spacing:.5px}
 .campo{display:flex;align-items:center;background:#fff;border:2px solid #b9dcf2;border-radius:14px;margin:10px 0;padding:0 12px;transition:.2s}
 .campo:focus-within{border-color:var(--az);box-shadow:0 0 0 4px rgba(79,195,247,.35)}
@@ -74,7 +74,7 @@ td button{border:0;background:none;font-size:18px}
 header em{font-style:normal;background:rgba(255,255,255,.2);border-radius:10px;padding:2px 8px;font-size:11px;margin-left:6px}
 #offline{background:#c0392b;color:#fff;text-align:center;padding:6px;font-size:13px}
 .tab{animation:entra .3s}.seg{margin-bottom:10px}.nota{font-size:12px;opacity:.8}
-.acc{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.acc .btn{flex:1;min-width:150px}
+body.maestro .acc{display:flex;flex-wrap:wrap;margin:8px 0}.acc .btn{margin:4px}body.maestro .acciones{display:flex;flex-wrap:wrap;align-items:center}.acciones .btn{padding:8px 10px;font-size:13px;margin:3px}.ed2{border:0;background:none;font-size:20px}.acc .btn{flex:1;min-width:150px}
 #prestBox{margin:12px 0}
 .hero{background:linear-gradient(135deg,#1565A8,#4FC3F7);color:#fff;border-radius:18px;padding:18px;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
 .hero b{font-size:34px}.hero.mal{background:linear-gradient(135deg,#a93226,#e67e22)}.hero small,.hero span{opacity:.92;font-size:13px}

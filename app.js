@@ -67,7 +67,7 @@ $("marcas").onclick = e => {
 };
 function setTipo(t) {
   tipo = t; $("bDom").classList.toggle("on", t === "domicilio"); $("bLoc").classList.toggle("on", t === "local");
-  $("datos").hidden = t === "local"; pintarMarcas();
+  $("datos").hidden = t === "local"; pintarMarcas(); actPrest();
 }
 $("bDom").onclick = () => setTipo("domicilio"); $("bLoc").onclick = () => setTipo("local");
 
@@ -105,18 +105,21 @@ $("btnGuardar").onclick = async () => {
       await setDoc(doc(db, "clientes", tel), c, {merge:true});
       Object.assign(p, {tel, nombre:(nom + " " + ape).trim(), direccion:dir});
     }
-    let ptel = p.tel, pnom = p.nombre;
+    let ptel = p.tel, pnom = p.nombre, pdir = p.direccion;
     if (prest > 0) {
-      if (tipo === "local") ptel = (prompt("Teléfono del cliente (8 dígitos) para registrar el tambo prestado") || "").replace(/\D/g, "");
-      if (ptel.length !== 8) return alert("Para registrar un tambo prestado se necesita el teléfono (8 dígitos).");
-      if (!pnom) { const cs = await getDoc(doc(db, "clientes", ptel)); if (cs.exists()) pnom = [cs.data().nombre, cs.data().apellido].filter(Boolean).join(" "); }
-      p.prestados = prest; p.tel = ptel;
+      if (tipo === "local") {
+        ptel = $("pTel").value.replace(/\D/g, ""); pnom = $("pNom").value.trim(); pdir = $("pDir").value.trim();
+        if (ptel.length !== 8 || !pnom || !pdir) return alert("Para un tambo prestado en venta local escribe teléfono (8 dígitos), nombre y dirección.");
+        Object.assign(p, {nombre:pnom, direccion:pdir});
+        await setDoc(doc(db, "clientes", ptel), {nombre:pnom, direcciones:arrayUnion(pdir)}, {merge:true});
+      } else if (!pnom) { const cs = await getDoc(doc(db, "clientes", ptel)); if (cs.exists()) pnom = [cs.data().nombre, cs.data().apellido].filter(Boolean).join(" "); }
+      Object.assign(p, {prestados:prest, tel:ptel, marcaTambo:$("pMarca").value});
     }
     await addDoc(collection(db, "pedidos"), p);
-    if (prest > 0) await setDoc(doc(db, "prestamos", ptel), {tel:ptel, nombre:pnom || "", tambos:increment(prest), ultimo:hoy()}, {merge:true});
+    if (prest > 0) await setDoc(doc(db, "prestamos", ptel), {tel:ptel, nombre:pnom || "", direccion:pdir || "", tambos:increment(prest), marcas:{[$("pMarca").value]:increment(prest)}, ultimo:hoy()}, {merge:true});
     await moverStock(n, -1);
     if (tipo === "domicilio") imprimir(p);
-    MARCAS.forEach(([k]) => cant[k] = 0); prest = 0; $("pN").textContent = 0;
+    MARCAS.forEach(([k]) => cant[k] = 0); prest = 0; $("pN").textContent = 0; ["pTel","pNom","pDir"].forEach(i => $(i).value = ""); actPrest();
     ["tel","nombre","apellido","dirNueva","tel2"].forEach(i => $(i).value = "");
     $("dirSel").hidden = true; $("estado").textContent = ""; cli = null; mostrarDir(); pintarMarcas();
   } catch (e) { alert("No se pudo guardar: " + e.message); }
@@ -395,16 +398,33 @@ $("btnImp").onclick = async () => {
   for (const {id, ...g} of HIST_G) await setDoc(doc(db,"gastos","imp-" + id), {...g, por:"importado", ts:serverTimestamp()});
   alert(`Listo: ${n} registros de ventas y ${HIST_G.length} gastos importados.`);
 };
-let prest = 0, prestamos = [];
-$("pMas").onclick = () => $("pN").textContent = ++prest;
-$("pMenos").onclick = () => { if (prest > 0) $("pN").textContent = --prest; };
+var prest = 0, prestamos = [];
+$("pMarca").innerHTML = MARCAS.map(([k,n]) => `<option value="${k}">${n}</option>`).join("");
+function actPrest() { $("prestDatos").hidden = prest <= 0; $("pLocal").hidden = tipo !== "local"; }
+$("pMas").onclick = () => { $("pN").textContent = ++prest; actPrest(); };
+$("pMenos").onclick = () => { if (prest > 0) $("pN").textContent = --prest; actPrest(); };
+const txtMarcas = m => Object.entries(m || {}).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${(MARCAS.find(x => x[0] === k) || [0, k])[1]}`).join(", ");
 function pintarPrest() {
   $("prestCard").innerHTML = `<div class="card"><h3>🛢️ Tambos prestados (${prestamos.reduce((s,x) => s + x.tambos, 0)})</h3>` +
-    (prestamos.map(x => `<div class="ped"><div class="info"><b>${esc(x.nombre || "Sin nombre")}</b> · ${esc(x.tel)}<br>${x.tambos} tambo(s) · último movimiento ${esc(x.ultimo || "")}</div><button class="btn dev" data-tel="${x.id}">Devolvió 1</button></div>`).join("") || "<p>Nadie tiene tambos prestados.</p>") + `</div>`;
+    (prestamos.map(x => `<div class="ped"><div class="info"><b>${esc(x.nombre || "Sin nombre")}</b> · ${esc(x.tel)}<br>${x.direccion ? esc(x.direccion) + "<br>" : ""}${x.tambos} tambo(s)${txtMarcas(x.marcas) ? ": " + esc(txtMarcas(x.marcas)) : ""} · último movimiento ${esc(x.ultimo || "")}</div>
+      <span class="solo-maestro acciones"><button class="btn dev" data-id="${x.id}">Devolvió 1</button><button class="btn dev" data-id="${x.id}" data-todos="1">Devolvió todos</button><button class="ed2" data-id="${x.id}">✏️</button></span></div>`).join("") || "<p>Nadie tiene tambos prestados.</p>") + `</div>`;
 }
 $("prestCard").onclick = async e => {
-  const b = e.target.closest(".dev"); if (!b) return; const x = prestamos.find(y => y.id === b.dataset.tel);
-  if (x && confirm(`¿${x.nombre || x.tel} devolvió 1 tambo?`)) await updateDoc(doc(db, "prestamos", x.id), {tambos:increment(-1), ultimo:hoy()});
+  if (rol !== "maestro") return;
+  const b = e.target.closest("button"); if (!b) return; const x = prestamos.find(y => y.id === b.dataset.id); if (!x) return;
+  const ref = doc(db, "prestamos", x.id), nom = x.nombre || x.tel, mn = h => (MARCAS.find(m => m[0] === h) || [0, h])[1];
+  if (b.classList.contains("ed2")) {
+    const n = prompt("Nombre del cliente", x.nombre || ""); if (n === null) return;
+    const d = prompt("Dirección", x.direccion || ""); if (d === null) return;
+    const t = prompt("Tambos que tiene prestados", x.tambos); if (t === null) return;
+    await updateDoc(ref, {nombre:n.trim(), direccion:d.trim(), tambos:Math.max(0, +t || 0), ...(+t > 0 ? {} : {marcas:{}}), ultimo:hoy()});
+  } else if (b.dataset.todos) {
+    if (confirm(`¿${nom} devolvió los ${x.tambos} tambos?`)) await updateDoc(ref, {tambos:0, marcas:{}, ultimo:hoy()});
+  } else if (confirm(`¿${nom} devolvió 1 tambo?`)) {
+    const hay = Object.entries(x.marcas || {}).filter(([, n]) => n > 0).map(([k]) => k); let k = hay[0];
+    if (hay.length > 1) { const r = (prompt("¿Qué marca devolvió? " + hay.map(mn).join(" / ")) || "").toLowerCase(); k = hay.find(h => r && mn(h).toLowerCase().startsWith(r)); if (!k) return alert("Marca no reconocida."); }
+    await updateDoc(ref, {tambos:increment(-1), ...(k ? {["marcas." + k]:increment(-1)} : {}), ultimo:hoy()});
+  }
 };
 $("btnPrecios").onclick = async () => {
   const d = +$("pDom").value, l = +$("pLoc").value; if (!(d > 0 && l > 0)) return alert("Escribe los dos precios.");
