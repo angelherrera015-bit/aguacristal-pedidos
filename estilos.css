@@ -5,9 +5,6 @@ body{margin:0;font:16px system-ui,sans-serif;background:var(--fondo);color:var(-
 input,select,button{font:inherit}
 input,select{width:100%;padding:12px;margin:5px 0;border:2px solid #b9dcf2;border-radius:10px;background:#fff}
 .btn{background:var(--nar);color:#fff;border:0;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer}
-#login{max-width:340px;margin:30px auto;text-align:center;padding:16px}
-#login img{width:150px}
-#login h1{color:var(--azo)}
 #err{color:#c0392b}
 header{display:flex;align-items:center;gap:10px;background:var(--az);color:#fff;padding:8px 12px}
 header img{height:40px;background:#fff;border-radius:8px;padding:2px}
@@ -58,3 +55,30 @@ table{border-collapse:collapse;width:100%;font-size:13px;background:#fff}
 th,td{border:1px solid #cfe9f8;padding:6px;text-align:left}
 th{background:var(--cel);color:#fff}
 td button{border:0;background:none;font-size:18px}
+
+#login{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#0D4A8A,#1565A8 45%,#4FC3F7);overflow:hidden;padding:16px}
+.burbujas i{position:absolute;bottom:-60px;border-radius:50%;background:rgba(255,255,255,.2);animation:sube 12s linear infinite}
+.lcard{position:relative;z-index:2;width:100%;max-width:370px;background:rgba(255,255,255,.93);backdrop-filter:blur(8px);border-radius:26px;padding:24px 22px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.3);animation:entra .7s cubic-bezier(.2,.9,.3,1.2)}
+.lcard img{width:130px;mix-blend-mode:multiply;animation:flota 3s ease-in-out infinite}
+.lcard h1{margin:4px 0 0;color:var(--azo);font-size:30px}.sub{margin:2px 0 12px;color:var(--az);font-size:13px;letter-spacing:.5px}
+.campo{display:flex;align-items:center;background:#fff;border:2px solid #b9dcf2;border-radius:14px;margin:10px 0;padding:0 12px;transition:.2s}
+.campo:focus-within{border-color:var(--az);box-shadow:0 0 0 4px rgba(79,195,247,.35)}
+.campo input{border:0;margin:0;background:none;outline:none;padding:13px 8px}.campo button{border:0;background:none;font-size:18px}
+.grande{width:100%;padding:14px;font-size:17px;background:linear-gradient(135deg,#F28C1E,#ff9f3d);box-shadow:0 8px 18px rgba(242,140,30,.4);transition:.2s;margin-top:6px}
+.grande:hover{transform:translateY(-2px)}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.7}
+.roles{font-size:12px;color:#5b7a93;margin:10px 0 0}.tiembla{animation:tiembla .4s}
+.ola{position:absolute;bottom:0;left:0;width:200%;height:110px;z-index:1;fill:rgba(255,255,255,.25);animation:olas 8s linear infinite}
+@keyframes sube{to{transform:translateY(-115vh)}}@keyframes entra{from{opacity:0;transform:translateY(16px)}}
+@keyframes flota{50%{transform:translateY(-8px)}}@keyframes olas{to{transform:translateX(-50%)}}
+@keyframes tiembla{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+header em{font-style:normal;background:rgba(255,255,255,.2);border-radius:10px;padding:2px 8px;font-size:11px;margin-left:6px}
+#offline{background:#c0392b;color:#fff;text-align:center;padding:6px;font-size:13px}
+.tab{animation:entra .3s}.seg{margin-bottom:10px}.nota{font-size:12px;opacity:.8}
+.acc{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.acc .btn{flex:1;min-width:150px}
+#prestBox{margin:12px 0}
+.hero{background:linear-gradient(135deg,#1565A8,#4FC3F7);color:#fff;border-radius:18px;padding:18px;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.hero b{font-size:34px}.hero.mal{background:linear-gradient(135deg,#a93226,#e67e22)}.hero small,.hero span{opacity:.92;font-size:13px}
+.barra{background:#d4ecfa;border-radius:10px;height:16px;overflow:hidden}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--cel),var(--ok));border-radius:10px;transition:width .8s}
+.bars{display:flex;gap:6px;align-items:flex-end;height:130px}.bar{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.bar i{width:100%;flex:none;background:var(--cel);border-radius:6px 6px 0 0;min-height:3px;transition:height .6s}.bar i.ok{background:var(--ok)}.bar b{font-size:12px}.bar small{margin-top:2px}
+@media (min-width:900px){.tab{max-width:980px}#marcas{grid-template-columns:repeat(4,1fr)}}

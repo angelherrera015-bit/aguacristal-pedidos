@@ -1,6 +1,6 @@
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,query,where,onSnapshot,serverTimestamp,arrayUnion,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,query,where,onSnapshot,serverTimestamp,arrayUnion,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // 1) PEGA AQUÍ LA CONFIGURACIÓN DE TU PROYECTO FIREBASE
 const firebaseConfig = {
@@ -13,7 +13,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app), db = getFirestore(app);
+const auth = getAuth(app), db = initializeFirestore(app, {localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
 const $ = id => document.getElementById(id);
 const MARCAS = [["salvavidas","Salvavidas"],["scandia","Scandia"],["carrera","Carrera"],["sinmarca","Sin marca"]];
 const PRECIO = {domicilio:10, local:9};
@@ -29,9 +29,14 @@ MARCAS.forEach(([k]) => cant[k] = 0);
 
 /* ---------- Acceso ---------- */
 $("btnLogin").onclick = async () => {
+  const b = $("btnLogin"); b.disabled = true; b.textContent = "Entrando…";
   try { await signInWithEmailAndPassword(auth, $("em").value.trim(), $("pw").value); $("err").textContent = ""; }
-  catch { $("err").textContent = "Correo o contraseña incorrectos."; }
+  catch { $("err").textContent = "Correo o contraseña incorrectos."; $("lcard").classList.remove("tiembla"); void $("lcard").offsetWidth; $("lcard").classList.add("tiembla"); }
+  b.disabled = false; b.textContent = "Entrar";
 };
+$("pw").onkeydown = e => { if (e.key === "Enter") $("btnLogin").click(); };
+$("ver").onclick = () => { $("pw").type = $("pw").type === "password" ? "text" : "password"; };
+addEventListener("offline", () => $("offline").hidden = false); addEventListener("online", () => $("offline").hidden = true);
 $("btnSalir").onclick = () => signOut(auth);
 onAuthStateChanged(auth, async u => {
   $("login").hidden = !!u; $("app").hidden = !u;
@@ -39,7 +44,7 @@ onAuthStateChanged(auth, async u => {
   const s = await getDoc(doc(db, "usuarios", u.uid));
   rol = s.exists() ? s.data().rol : "operador";
   document.body.classList.toggle("maestro", rol === "maestro");
-  $("quien").textContent = u.email + " · " + rol;
+  const nom = u.email.split("@")[0]; $("quien").innerHTML = "Hola, <b>" + esc(nom[0].toUpperCase() + nom.slice(1)) + "</b><em>" + (rol === "maestro" ? "Administrador" : esc(rol[0].toUpperCase() + rol.slice(1))) + "</em>";
   if (!escuchando) { escuchando = true; iniciar(); }
 });
 
@@ -100,10 +105,18 @@ $("btnGuardar").onclick = async () => {
       await setDoc(doc(db, "clientes", tel), c, {merge:true});
       Object.assign(p, {tel, nombre:(nom + " " + ape).trim(), direccion:dir});
     }
+    let ptel = p.tel, pnom = p.nombre;
+    if (prest > 0) {
+      if (tipo === "local") ptel = (prompt("Teléfono del cliente (8 dígitos) para registrar el tambo prestado") || "").replace(/\D/g, "");
+      if (ptel.length !== 8) return alert("Para registrar un tambo prestado se necesita el teléfono (8 dígitos).");
+      if (!pnom) { const cs = await getDoc(doc(db, "clientes", ptel)); if (cs.exists()) pnom = [cs.data().nombre, cs.data().apellido].filter(Boolean).join(" "); }
+      p.prestados = prest; p.tel = ptel;
+    }
     await addDoc(collection(db, "pedidos"), p);
+    if (prest > 0) await setDoc(doc(db, "prestamos", ptel), {tel:ptel, nombre:pnom || "", tambos:increment(prest), ultimo:hoy()}, {merge:true});
     await moverStock(n, -1);
     if (tipo === "domicilio") imprimir(p);
-    MARCAS.forEach(([k]) => cant[k] = 0);
+    MARCAS.forEach(([k]) => cant[k] = 0); prest = 0; $("pN").textContent = 0;
     ["tel","nombre","apellido","dirNueva","tel2"].forEach(i => $(i).value = "");
     $("dirSel").hidden = true; $("estado").textContent = ""; cli = null; mostrarDir(); pintarMarcas();
   } catch (e) { alert("No se pudo guardar: " + e.message); }
@@ -148,6 +161,9 @@ function iniciar() {
     if (primeraLl) { primeraLl = false; return; }
     s.docChanges().forEach(c => { if (c.type !== "added") return; const n = String(c.doc.data().tel || "").replace(/\D/g, "").slice(-8); if (n.length === 8) llamada(n); deleteDoc(c.doc.ref).catch(() => {}); });
   });
+  onSnapshot(collection(db, "prestamos"), s => { prestamos = s.docs.map(d => ({id:d.id, ...d.data()})).filter(x => x.tambos > 0); pintarPrest(); pintarInicio(); });
+  onSnapshot(doc(db, "config", "precios"), s => { if (s.exists()) Object.assign(PRECIO, s.data()); $("pDom").value = PRECIO.domicilio; $("pLoc").value = PRECIO.local; pintarMarcas(); });
+  if (rol === "maestro") document.querySelector('nav button[data-t="inicio"]').click();
   const tp = new URLSearchParams(location.search).get("tel");
   if (tp) {
     const n = tp.replace(/\D/g, "").slice(-8);
@@ -193,7 +209,7 @@ function pintarRes() {
       filasDia(del).map(r => `<tr><td>${r.fecha}</td><td>${r.l}</td><td>${r.dm}</td><td>${r.t}${r.meta && r.t >= r.meta ? " ✅" : ""}</td><td>Q${r.q}</td><td>${r.meta}</td></tr>`).join("") + `</table></div>`);
   $("lista").innerHTML = tipo !== "dia" ? "" : del.map(p => `<div class="ped ${p.entregado ? "ok" : ""}">
     <input type="checkbox" data-id="${p.id}" ${p.entregado ? "checked" : ""}>
-    <div class="info"><b>${p.tipo === "local" ? "🏪 Local" : "🛵 " + esc(p.nombre || "Sin nombre")}</b> · ${p.hora.slice(0,5)}<br>${p.tipo === "domicilio" ? esc(p.direccion) + " · " + esc(p.tel) + "<br>" : ""}${mix(p.items)} · Q${p.total}</div>
+    <div class="info"><b>${p.tipo === "local" ? "🏪 Local" : "🛵 " + esc(p.nombre || "Sin nombre")}</b> · ${p.hora.slice(0,5)}<br>${p.tipo === "domicilio" ? esc(p.direccion) + " · " + esc(p.tel) + "<br>" : ""}${[mix(p.items), "Q" + p.total].filter(Boolean).join(" · ")}</div>
     <span class="solo-maestro"><button data-id="${p.id}" class="ed">✏️</button><button data-id="${p.id}" class="del">🗑️</button></span></div>`).join("") || "<p>Sin pedidos este día.</p>";
 }
 $("btnAdd").onclick = async () => {
@@ -238,9 +254,11 @@ $("btnExcel").onclick = () => {
 const P = (id, n, m, c, x = {}) => ({id, n, m, c, ...x});
 const PLAN0 = [P("repartidor","Sueldo repartidor",4000*6/26,1,{sem:true}), P("operadora","Sueldo operadora",3500*6/26,1,{sem:true}), P("alquiler","Alquiler del local",1500,1,{d1:10,d2:15}), P("agua","Agua",1000,1,{d1:20,d2:25}), P("luz","Luz",200,1,{d1:20,d2:25}), P("internet","Internet",100,1,{fijo:true}), P("tapones","Tapones y sellos",420,1), P("gasolina","Gasolina de la moto",300,1), P("imprevistos","Daños o imprevistos (tubería y moto)",400,1), P("sal","Sal Morton",230,3), P("jabon","Jabón para lavar tambos",80,6), P("acido","Ácido limpia tubos",275,4), P("lampara","Lámpara UV y ozono",2000,12), P("filtro","Filtro",110,3), P("servicio","Servicio de la moto",150,2), P("bono","Bono 14 y aguinaldo (2 empleados x Q2,800 x 2 veces al año)",11200,12)];
 let plan = PLAN0, consumo = {}, inv = [], gastos = [], pedAdm = [];
-const PROM = 9.72, SEM_MES = 26 / 6;
+const SEM_MES = 26 / 6;
+const prom = () => { const c = suma(pedAdm); return c > 50 ? pedAdm.reduce((s,p) => s + p.total, 0) / c : 9.72; };
+const diasLaborados = () => { const t = new Date(); let n = 0; for (let d = 1; d <= t.getDate(); d++) if (new Date(t.getFullYear(), t.getMonth(), d).getDay()) n++; return n; };
 const Q = n => "Q" + (+n).toLocaleString("es-GT",{minimumFractionDigits:2,maximumFractionDigits:2});
-const mensual = p => p.sem ? p.m * SEM_MES : p.m / p.c, totalMes = () => plan.reduce((s,p) => s + mensual(p), 0), equilibrio = () => Math.ceil(totalMes() / 26 / PROM);
+const mensual = p => p.sem ? p.m * SEM_MES : p.m / p.c, totalMes = () => plan.reduce((s,p) => s + mensual(p), 0), equilibrio = () => Math.ceil(totalMes() / 26 / prom());
 const FONDO_DESDE = "2026-11";
 const G_SEM = "Pagos semanales (sueldos)", G_FIJO = "Fijos del mes", G_INS = "Insumos e imprevistos (al terminarse)", G_PRO = "Prorrateados: apartar cada mes";
 const grupo = p => p.sem ? G_SEM : p.c > 1 ? G_PRO : (p.d1 || p.fijo) ? G_FIJO : G_INS;
@@ -283,7 +301,7 @@ function iniciarAdmin() {
   onSnapshot(query(collection(db,"pedidos"), where("fecha",">=",sumaDia(lunes(),-84))), s => { pedAdm = s.docs.map(d => d.data()); pintarAdmin(); });
   sembrar();
 }
-function pintarAdmin() { if (rol !== "maestro") return; pintarGastos(); pintarSemanas(); pintarPend(); pintarRegistro(); }
+function pintarAdmin() { if (rol !== "maestro") return; pintarInicio(); pintarGastos(); pintarSemanas(); pintarPend(); pintarRegistro(); }
 function pintarGastos() {
   const mes = hoy().slice(0,7), pag = id => sumaG(gastos.filter(g => g.planId === id && mesDe(g.fecha) === mes));
   const tabla = n => { const f = plan.filter(p => grupo(p) === n); return f.length ? `<h3>${n}</h3><table><tr><th>Concepto</th><th>Pago</th><th>Cuándo</th><th>Mensual</th><th>Pagado este mes</th><th></th></tr>` +
@@ -302,14 +320,14 @@ function pintarSemanas() {
     <p>${s.dif >= 0 ? "Sobraron " : "Faltaron "}<b>${Q(Math.abs(s.dif))}</b> frente al gasto necesario de ${Q(s.need)}${s.dias < 6 ? " para los días que van" : " (gasto mensual ÷ 4.33)"}.</p></div>
     <div class="kpi"><div><b>${s.gar}</b>Garrafones (meta ${meta})</div><div><b>${Q(s.ing)}</b>Ingresos</div><div><b>${Q(s.pag)}</b>Pagado</div></div>
     <div class="card"><h3>Pagos de la semana</h3>${s.gs.map(g => `<p>${g.fecha} · ${esc(g.concepto)} · <b>${Q(g.monto)}</b></p>`).join("") || "<p>Sin pagos registrados.</p>"}
-    <p>Ingresos menos pagos de la semana: <b>${Q(s.ing - s.pag)}</b></p></div>
+    <p>Ingresos menos pagos de la semana: <b>${Q(s.ing - s.pag)}</b></p><p class="nota">Si sale negativo, pagaste más de lo que vendiste esa semana (por ejemplo, la renta). El gasto necesario ya reparte esos pagos entre las semanas.</p></div>
     <div class="card"><h3>Sueldos de la semana</h3>${plan.filter(p => p.sem).map(p => { const h = s.gs.filter(g => g.planId === p.id); return `<p>${h.length ? "✅" : "⏳"} ${esc(p.n)}: ${h.length ? "pagado " + Q(sumaG(h)) : "pendiente " + Q(p.m)}</p>`; }).join("")}</div>`;
 }
 function pintarPend() {
   const m = $("pendMes").value || hoy().slice(0,7), f = filasPend(m), pend = f.filter(x => !x.hecho.length), dia = new Date().getDate(), actual = m === hoy().slice(0,7);
   const estado = x => x.hecho.length ? "✅ Pagado " + Q(sumaG(x.hecho)) : "⏳ Pendiente · aprox. " + Q(x.p.m) + (x.p.d1 ? " · se paga del " + x.p.d1 + " al " + x.p.d2 : " · al terminarse") +
     (actual && x.p.d1 ? (dia > x.p.d2 ? " · ⚠️ pasó la fecha usual" : dia >= x.p.d1 ? " · ⏰ toca pagar ahora" : "") : "") + (!x.prev && x.p.c > 1 ? " · sin compra registrada" : "");
-  $("pendDet").innerHTML = `<div class="card"><h3>Pendiente de pagar o comprar</h3><b>${Q(pend.reduce((s,x) => s + x.p.m, 0))}</b> aproximado · ${pend.length} de ${f.length} conceptos que tocan este mes (los sueldos se ven en Semanas)</div>` +
+  $("pendDet").innerHTML = `<div class="card"><h3>Pendiente de pagar o comprar</h3><b>${Q(pend.filter(x => x.p.c === 1 || x.prev).reduce((s,x) => s + x.p.m, 0))}</b> aproximado · ${pend.length} de ${f.length} conceptos que tocan este mes. Los prorrateados sin compra registrada salen del fondo y no suman aquí. Los sueldos se ven en Semanas.</div>` +
     f.map(x => `<div class="ped ${x.hecho.length ? "ok" : ""}"><div class="info"><b>${esc(x.p.n)}</b><br>${estado(x)}</div></div>`).join("") +
     `<div class="card"><h3>Stock</h3>` + ["tapones","sellos"].map(id => { const i = inv.find(x => x.id === id); return i ? `<div class="ped ${i.stock <= i.minimo ? "bajo" : ""}"><div class="info"><b>${esc(i.nombre)}</b>: ${Math.round(i.stock)} · avisar en ${i.minimo}</div><button data-id="${id}" class="aj">✏️</button></div>` : ""; }).join("") + `</div>`;
 }
@@ -377,5 +395,36 @@ $("btnImp").onclick = async () => {
   for (const {id, ...g} of HIST_G) await setDoc(doc(db,"gastos","imp-" + id), {...g, por:"importado", ts:serverTimestamp()});
   alert(`Listo: ${n} registros de ventas y ${HIST_G.length} gastos importados.`);
 };
+let prest = 0, prestamos = [];
+$("pMas").onclick = () => $("pN").textContent = ++prest;
+$("pMenos").onclick = () => { if (prest > 0) $("pN").textContent = --prest; };
+function pintarPrest() {
+  $("prestCard").innerHTML = `<div class="card"><h3>🛢️ Tambos prestados (${prestamos.reduce((s,x) => s + x.tambos, 0)})</h3>` +
+    (prestamos.map(x => `<div class="ped"><div class="info"><b>${esc(x.nombre || "Sin nombre")}</b> · ${esc(x.tel)}<br>${x.tambos} tambo(s) · último movimiento ${esc(x.ultimo || "")}</div><button class="btn dev" data-tel="${x.id}">Devolvió 1</button></div>`).join("") || "<p>Nadie tiene tambos prestados.</p>") + `</div>`;
+}
+$("prestCard").onclick = async e => {
+  const b = e.target.closest(".dev"); if (!b) return; const x = prestamos.find(y => y.id === b.dataset.tel);
+  if (x && confirm(`¿${x.nombre || x.tel} devolvió 1 tambo?`)) await updateDoc(doc(db, "prestamos", x.id), {tambos:increment(-1), ultimo:hoy()});
+};
+$("btnPrecios").onclick = async () => {
+  const d = +$("pDom").value, l = +$("pLoc").value; if (!(d > 0 && l > 0)) return alert("Escribe los dos precios.");
+  await setDoc(doc(db, "config", "precios"), {domicilio:d, local:l}); alert("Precios guardados. Aplican a los pedidos nuevos.");
+};
+const dLetra = f => "DLMMJVS"[new Date(f + "T12:00:00").getDay()];
+function pintarInicio() {
+  if (rol !== "maestro") return;
+  const mes = hoy().slice(0,7), ing = pedAdm.filter(p => p.fecha.startsWith(mes)).reduce((s,p) => s + p.total, 0);
+  const prorr = totalMes() * Math.min(diasLaborados(), 26) / 26, pagado = sumaG(gastos.filter(g => mesDe(g.fecha) === mes)), gan = ing - prorr;
+  const meta = metas[new Date().getDay()] || 0, hoyN = suma(pedAdm.filter(p => p.fecha === hoy())), pct = meta ? Math.min(100, Math.round(hoyN / meta * 100)) : 0;
+  const dias = Array.from({length:7}, (_,k) => { const f = sumaDia(hoy(), k - 6); return {f, n:suma(pedAdm.filter(p => p.fecha === f)), m:metas[new Date(f + "T12:00:00").getDay()] || 0}; });
+  const max = Math.max(1, ...dias.map(d => Math.max(d.n, d.m))), dia = new Date().getDate(), alertas = [];
+  filasPend(mes).filter(x => !x.hecho.length && x.p.d1 && dia >= x.p.d1).forEach(x => alertas.push(`⏰ ${x.p.n}: toca pagar (del ${x.p.d1} al ${x.p.d2})`));
+  inv.filter(i => i.stock <= i.minimo).forEach(i => alertas.push(`⚠️ Stock bajo: ${i.nombre} (${Math.round(i.stock)})`));
+  $("inicioDet").innerHTML = `<div class="hero ${gan < 0 ? "mal" : ""}"><small>Ganancia estimada del mes</small><b>${Q(gan)}</b><span>Ingresos ${Q(ing)} − gastos prorrateados a hoy ${Q(prorr)}</span><span>Caja del mes (ingresos − pagado): ${Q(ing - pagado)}</span></div>
+  <div class="card"><h3>Meta de hoy</h3><div class="barra"><i style="width:${pct}%"></i></div><p><b>${hoyN}</b> de ${meta || "sin meta"} garrafones</p></div>
+  <div class="card"><h3>Últimos 7 días</h3><div class="bars">${dias.map(d => `<div class="bar"><b>${d.n}</b><i class="${d.m && d.n >= d.m ? "ok" : ""}" style="height:${Math.round(d.n / max * 70)}%"></i><small>${dLetra(d.f)}</small></div>`).join("")}</div></div>
+  <div class="kpi"><div><b>${prestamos.reduce((s,x) => s + x.tambos, 0)}</b>Tambos prestados</div><div><b>${equilibrio()}</b>Equilibrio diario</div><div><b>${Q(prom())}</b>Precio promedio</div></div>
+  <div class="card"><h3>Atención</h3>${alertas.map(t => `<p>${t}</p>`).join("") || "<p>✅ Todo al día.</p>"}</div>`;
+}
 
 pintarMarcas();

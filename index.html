@@ -10,15 +10,22 @@
 <body>
 
 <section id="login">
-  <img src="mascota.png" alt="" onerror="this.style.display='none'">
-  <h1>Agua Cristal</h1>
-  <input id="em" type="email" placeholder="Correo">
-  <input id="pw" type="password" placeholder="Contraseña">
-  <button id="btnLogin" class="btn">Entrar</button>
-  <p id="err"></p>
+  <div class="burbujas"><i style="left:6%;width:26px;height:26px;animation-duration:9s;animation-delay:0s"></i><i style="left:18%;width:16px;height:16px;animation-duration:12s;animation-delay:2s"></i><i style="left:32%;width:34px;height:34px;animation-duration:10s;animation-delay:4s"></i><i style="left:48%;width:20px;height:20px;animation-duration:13s;animation-delay:1s"></i><i style="left:63%;width:28px;height:28px;animation-duration:9s;animation-delay:5s"></i><i style="left:78%;width:18px;height:18px;animation-duration:11s;animation-delay:3s"></i><i style="left:90%;width:32px;height:32px;animation-duration:14s;animation-delay:6s"></i></div>
+  <div class="lcard" id="lcard">
+    <img src="mascota.png" alt="" onerror="this.style.display='none'">
+    <h1>Agua Cristal</h1>
+    <p class="sub">Purificando tu vida desde 2008</p>
+    <label class="campo"><span>✉️</span><input id="em" type="email" placeholder="Correo" autocomplete="username"></label>
+    <label class="campo"><span>🔒</span><input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password"><button id="ver" type="button" aria-label="Mostrar contraseña">👁</button></label>
+    <button id="btnLogin" class="btn grande">Entrar</button>
+    <p id="err"></p>
+    <p class="roles">👑 Administrador · 📞 Operadora · 🛵 Motorista</p>
+  </div>
+  <svg class="ola" viewBox="0 0 2880 120" preserveAspectRatio="none"><path d="M0,60 C240,0 480,120 720,60 C960,0 1200,120 1440,60 C1680,0 1920,120 2160,60 C2400,0 2640,120 2880,60 V120 H0Z"/></svg>
 </section>
 
 <main id="app" hidden>
+  <div id="offline" hidden>📴 Sin internet: los pedidos se guardan y se enviarán al volver la conexión.</div>
   <header>
     <img src="logo.png" alt="Agua Cristal" onerror="this.style.display='none'">
     <span id="quien"></span>
@@ -26,6 +33,8 @@
   </header>
 
   <div id="llamada" class="card" hidden></div>
+
+  <section id="t-inicio" class="tab" hidden><div id="inicioDet"></div></section>
 
   <section id="t-pedido" class="tab">
     <div class="seg">
@@ -38,12 +47,13 @@
       <p id="estado"></p>
       <input id="nombre" placeholder="Nombre (opcional)">
       <input id="apellido" placeholder="Apellido (opcional)">
-      <select id="dirSel"></select>
+      <select id="dirSel" hidden></select>
       <input id="dirNueva" placeholder="Dirección">
       <input id="tel2" inputmode="numeric" maxlength="8" placeholder="Teléfono opcional">
     </div>
 
     <div id="marcas"></div>
+    <div class="marca" id="prestBox"><b>🛢️ Tambo prestado</b><div><button id="pMenos">−</button><span id="pN">0</span><button id="pMas">+</button></div></div>
     <div class="total"><span id="totTxt"></span><button id="btnGuardar" class="btn">Guardar pedido</button></div>
   </section>
 
@@ -53,10 +63,10 @@
       <input type="date" id="dia"><input type="date" id="dia2" hidden>
     </div>
     <p id="perTxt"></p>
-    <button id="btnExcel" class="btn solo-maestro">Descargar reporte (Excel)</button>
-    <button id="btnAdd" class="btn solo-maestro">➕ Agregar ventas de este día</button>
+    <div class="acc solo-maestro"><button id="btnExcel" class="btn">Descargar reporte (Excel)</button><button id="btnAdd" class="btn">➕ Agregar ventas de este día</button></div>
     <div id="resumen"></div>
     <div id="stockBox"></div>
+    <div id="prestCard"></div>
     <div id="lista"></div>
   </section>
 
@@ -67,6 +77,9 @@
       <p>Meta diaria (garrafones)</p>
       <div id="inputsMeta"></div>
       <button id="btnMetas" class="btn">Guardar metas</button>
+      <h4>Precios por garrafón (Q)</h4>
+      <input id="pDom" type="number" step="any" placeholder="Domicilio"><input id="pLoc" type="number" step="any" placeholder="Local">
+      <button id="btnPrecios" class="btn">Guardar precios</button>
     </div>
   </section>
 
@@ -97,6 +110,7 @@
   </section>
 
   <nav>
+    <button data-t="inicio" class="solo-maestro">Inicio</button>
     <button data-t="pedido" class="on">Ventas</button>
     <button data-t="ventas">Resumen</button>
     <button data-t="metas">Metas</button>
