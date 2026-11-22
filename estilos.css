@@ -82,3 +82,7 @@ body.maestro .acc{display:flex;flex-wrap:wrap;margin:8px 0}.acc .btn{margin:4px}
 .bars{display:flex;gap:6px;align-items:flex-end;height:130px}.bar{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
 .bar i{width:100%;flex:none;background:var(--cel);border-radius:6px 6px 0 0;min-height:3px;transition:height .6s}.bar i.ok{background:var(--ok)}.bar b{font-size:12px}.bar small{margin-top:2px}
 @media (min-width:900px){.tab{max-width:980px}#marcas{grid-template-columns:repeat(4,1fr)}}
+.ped.pr{flex-wrap:wrap}.ped.pr .info{flex:1 1 100%}
+body.maestro .ped.pr .acciones{display:flex;flex-wrap:wrap;width:100%}
+.ped .pb{border:0;border-radius:10px;padding:9px 12px;font-size:14px;font-weight:700;color:#fff;background:#2e9e5b;margin:3px 6px 3px 0}
+.ped .pb.todo{background:#c0392b}.ped .pb.ed2{background:#e3f1fb;color:#0D4A8A}

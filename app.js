@@ -405,9 +405,10 @@ $("pMas").onclick = () => { $("pN").textContent = ++prest; actPrest(); };
 $("pMenos").onclick = () => { if (prest > 0) $("pN").textContent = --prest; actPrest(); };
 const txtMarcas = m => Object.entries(m || {}).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${(MARCAS.find(x => x[0] === k) || [0, k])[1]}`).join(", ");
 function pintarPrest() {
+  const suma = m => Object.values(m || {}).reduce((s,n) => s + Math.max(0, n), 0);
   $("prestCard").innerHTML = `<div class="card"><h3>🛢️ Tambos prestados (${prestamos.reduce((s,x) => s + x.tambos, 0)})</h3>` +
-    (prestamos.map(x => `<div class="ped"><div class="info"><b>${esc(x.nombre || "Sin nombre")}</b> · ${esc(x.tel)}<br>${x.direccion ? esc(x.direccion) + "<br>" : ""}${x.tambos} tambo(s)${txtMarcas(x.marcas) ? ": " + esc(txtMarcas(x.marcas)) : ""} · último movimiento ${esc(x.ultimo || "")}</div>
-      <span class="solo-maestro acciones"><button class="btn dev" data-id="${x.id}">Devolvió 1</button><button class="btn dev" data-id="${x.id}" data-todos="1">Devolvió todos</button><button class="ed2" data-id="${x.id}">✏️</button></span></div>`).join("") || "<p>Nadie tiene tambos prestados.</p>") + `</div>`;
+    (prestamos.map(x => `<div class="ped pr"><div class="info"><b>${esc(x.nombre || "Sin nombre")}</b> · ${esc(x.tel)}<br>${x.direccion ? esc(x.direccion) + "<br>" : ""}${x.tambos} tambo(s)${txtMarcas(x.marcas) && suma(x.marcas) === x.tambos ? ": " + esc(txtMarcas(x.marcas)) : ""} · último movimiento ${esc(x.ultimo || "")}</div>
+      <span class="solo-maestro acciones"><button class="pb" data-id="${x.id}">✅ Devolvió 1</button><button class="pb todo" data-id="${x.id}" data-todos="1">🗑️ Devolvió todos</button><button class="pb ed2" data-id="${x.id}">✏️ Editar</button></span></div>`).join("") || "<p>Nadie tiene tambos prestados.</p>") + `</div>`;
 }
 $("prestCard").onclick = async e => {
   if (rol !== "maestro") return;
@@ -417,7 +418,8 @@ $("prestCard").onclick = async e => {
     const n = prompt("Nombre del cliente", x.nombre || ""); if (n === null) return;
     const d = prompt("Dirección", x.direccion || ""); if (d === null) return;
     const t = prompt("Tambos que tiene prestados", x.tambos); if (t === null) return;
-    await updateDoc(ref, {nombre:n.trim(), direccion:d.trim(), tambos:Math.max(0, +t || 0), ...(+t > 0 ? {} : {marcas:{}}), ultimo:hoy()});
+    const cnt = Math.max(0, +t || 0), hay = Object.keys(x.marcas || {}).filter(k => x.marcas[k] > 0);
+    await updateDoc(ref, {nombre:n.trim(), direccion:d.trim(), tambos:cnt, marcas:(cnt > 0 && hay.length === 1) ? {[hay[0]]:cnt} : {}, ultimo:hoy()});
   } else if (b.dataset.todos) {
     if (confirm(`¿${nom} devolvió los ${x.tambos} tambos?`)) await updateDoc(ref, {tambos:0, marcas:{}, ultimo:hoy()});
   } else if (confirm(`¿${nom} devolvió 1 tambo?`)) {
